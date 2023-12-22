@@ -53,7 +53,7 @@ func (h *DataBaseHandler) add(w http.ResponseWriter, r *http.Request) {
 
 	// Access the key-value pair
 	// Access the data
-	fmt.Printf("Received data: %+v\n", keyValueMap)
+	fmt.Printf("Adder Received data: %+v\n", keyValueMap)
 
   fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
 
@@ -78,7 +78,7 @@ func (h *DataBaseHandler) add(w http.ResponseWriter, r *http.Request) {
 }
 
 
-func (h *DataBaseHandler) status(w http.ResponseWriter, r *http.Request) {
+func (h *DataBaseHandler) statusHandler(w http.ResponseWriter, r *http.Request) {
 
   var respBody = ""
   err := h.Database.View(func(tx *bolt.Tx) error {
@@ -108,7 +108,6 @@ func (h *DataBaseHandler) status(w http.ResponseWriter, r *http.Request) {
         status_string[k] = "\t" + v + "\n"
         respBody += status_string[k]
       }
-      fmt.Println("------------")
     }
     return nil
 	 
@@ -119,6 +118,57 @@ func (h *DataBaseHandler) status(w http.ResponseWriter, r *http.Request) {
 	}
   w.Write([]byte(respBody))
 }
+
+
+func (h *DataBaseHandler) removeHandler(w http.ResponseWriter, r *http.Request) {
+  // Update the database
+	var err = h.Database.Update(func(tx *bolt.Tx) error {
+		// Get or create a bucket (similar to a table in relational databases)
+		bucket, err := tx.CreateBucketIfNotExists([]byte(BUCKET_NAME))
+		if err != nil {
+			return err
+		}
+
+    body, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+      http.Error(w, "Error reading request body", http.StatusBadRequest)
+      return err
+    }
+
+    var keyValueMap map[string]string
+
+	  // Unmarshal the JSON data into the map
+	  err = json.Unmarshal([]byte(body), &keyValueMap)
+	  if err != nil {
+	  	fmt.Println("Error unmarshaling JSON:", err)
+	  	return err
+	  }
+
+	  // Access the key-value pair
+	  // Access the data
+	  fmt.Printf("Remover Received data: %+v\n", keyValueMap)
+
+    fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
+
+	  // Write data to the bucket
+	  key := []byte(keyValueMap["key1"])
+
+		// Delete the key from the bucket.
+		err = bucket.Delete(key)
+		if err != nil {
+			return err
+		}
+	  return nil
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+
+  w.Write([]byte("this is my home page"))
+}
+
 
 func realMain(args []string) string  {
   mode :=  args[1]
@@ -132,6 +182,8 @@ func realMain(args []string) string  {
     } else if arg == "status" {
       getStatus()
       return ""
+    } else if arg == "remove" {
+      return remove(os.Args[3])
     } else {
       return "Unknown argument, should be add|status"
     }
@@ -160,7 +212,12 @@ func startServer() {
 	}) 
 
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		myHandler.status(w, r)
+		myHandler.statusHandler(w, r)
+	}) 
+
+
+	http.HandleFunc("/remove", func(w http.ResponseWriter, r *http.Request) {
+		myHandler.removeHandler(w, r)
 	}) 
 
 	// Start the HTTP server on port 8080
@@ -233,4 +290,44 @@ func getStatus() {
 
 	// Print the response body
 	fmt.Println(string(body))
+}
+
+
+func remove(path string) string {
+  if !utils.IsGitRepository(path) {
+    return "Specified path is not a git repository"
+  }
+	// This key is hardcoded because we use it to access the dictionary that is later unmarshalled 
+  // For the actual database we use path as key and as value
+  postData := []byte(fmt.Sprintf(`{"key1": "%s"}`, path))
+  log.Println("Sending" + string(postData))
+
+  // Create new request with the current path
+	req, err := http.NewRequest("POST", URL + "/remove", bytes.NewBuffer(postData))
+	if err != nil {
+		log.Fatal("Error creating request:", err)
+		return "Error during creating"
+	}
+
+	// Set the Content-Type header
+	req.Header.Set("Content-Type", "application/json")
+
+	// Create an HTTP client
+	client := &http.Client{}
+
+	// Send the request
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error sending request:", err)
+		return "Error during sending"
+	}
+	defer resp.Body.Close()
+
+	// Print the response status and body
+	log.Println("Response Status:", resp.Status)
+  if  resp.Status != "200 OK" {
+	  log.Println("There was an error during adding the current path")
+	  return "Error during removing the path"
+	}
+  return path + " removed"
 }
