@@ -4,11 +4,14 @@ import (
   "bytes"
   "time"
   "log"
+  "strings"
   "net/http"
   "html"
   "encoding/json"
   "io/ioutil"
   "os"
+  "GitWatch/src"
+	. "github.com/go-git/go-git/v5/_examples"
 )
 
 
@@ -77,39 +80,39 @@ func (h *DataBaseHandler) add(w http.ResponseWriter, r *http.Request) {
 
 func (h *DataBaseHandler) status(w http.ResponseWriter, r *http.Request) {
 
-  var respBody = "["
+  var respBody = ""
   err := h.Database.View(func(tx *bolt.Tx) error {
 		// Assume you have a bucket named "mybucket"
     b := tx.Bucket([]byte(BUCKET_NAME))
     
-    fmt.Printf("status")
     c := b.Cursor()
     
 
-
     for k, v := c.First(); k != nil; k, v = c.Next() {
-      respBody = respBody + fmt.Sprintf(`{"%s, %s"},`, string(k), string(v))
+      respBody +=  "Current repository: " + string(v) + "\n"
+      var repo, _ = utils.OpenRepo(string(v))
+	    wk, err := repo.Worktree()
+      CheckIfError(err)
+        
+      status, _:= wk.Status()
+
+
+    	if status.IsClean() == true {
+        w.Write([]byte(""))
+        return err
+      }
+
+      var status_string  []string = strings.Split(status.String(), "\n")
+      
+      for k, v := range status_string {
+        status_string[k] = "\t" + v + "\n"
+        respBody += status_string[k]
+      }
+      fmt.Println("------------")
     }
-
-
-    str := respBody
-
-	  // Convert the string to a rune slice
-	  runes := []rune(str)
-
-	  // Check if the string is not empty
-	  if len(runes) > 0 {
-	  	// Change the last character
-	  	runes[len(runes)-1] = ']'
-	  }
-
-	  // Convert the rune slice back to a string
-	  newStr := string(runes)
-    respBody = newStr
     return nil
 	 
   })
-  fmt.Printf("RESP" + respBody)
 
 	if err != nil {
 		log.Fatal(err)
@@ -124,8 +127,8 @@ func realMain(args []string) string  {
   } else if mode == "client" {
     arg :=  os.Args[2]
     if arg == "add"  {
-      addRepository(os.Args[3])
-      return "Added repository"
+      
+      return addRepository(os.Args[3])
     } else if arg == "status" {
       getStatus()
       return ""
@@ -153,39 +156,39 @@ func startServer() {
 
 	// Define a handler function for the "/hello" endpoint
 	http.HandleFunc("/add", func(w http.ResponseWriter, r *http.Request) {
-		// Call the ServeHTTP method of your custom handler
-    fmt.Println("ADD")
 		myHandler.add(w, r)
 	}) 
 
 	http.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-    fmt.Println("STATUS")
 		myHandler.status(w, r)
 	}) 
 
 	// Start the HTTP server on port 8080
   port := 8000
-  fmt.Printf("Server listening on :%d...\n", port)
+  log.Printf("Server listening on :%d...\n", port)
   err = http.ListenAndServe("127.0.0.1:8000", nil)
   if err != nil {
-  	fmt.Println("Error:", err)
+  	log.Println("Error:", err)
   }
 }
 
 
 
-func addRepository(path string) {
-// URL to send the POST request to
-
+func addRepository(path string) string {
+  
+  if !utils.IsGitRepository(path) {
+    return "Specified path is not a git repository"
+  }
 	// This key is hardcoded because we use it to access the dictionary that is later unmarshalled 
   // For the actual database we use path as key and as value
   postData := []byte(fmt.Sprintf(`{"key1": "%s"}`, path))
   log.Println("Sending" + string(postData))
+
   // Create new request with the current path
 	req, err := http.NewRequest("POST", URL + "/add", bytes.NewBuffer(postData))
 	if err != nil {
 		log.Fatal("Error creating request:", err)
-		return
+		return "Error during adding"
 	}
 
 	// Set the Content-Type header
@@ -198,17 +201,19 @@ func addRepository(path string) {
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Println("Error sending request:", err)
-		return
+		return "Error during sending"
 	}
 	defer resp.Body.Close()
 
 	// Print the response status and body
 	log.Println("Response Status:", resp.Status)
   if  resp.Status != "200 OK" {
-	  fmt.Println("There was an error during adding the current path")
-	  return
+	  log.Println("There was an error during adding the current path")
+	  return "Error during adding the path"
 	}
+  return "Path added"
 }
+
 
 func getStatus() {
   // Make the GET request
