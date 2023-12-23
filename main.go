@@ -14,6 +14,11 @@ import bolt "go.etcd.io/bbolt"
 
 
 func realMain(args []string) string  {
+
+  if len(args) == 1 {
+    return "Please provide a mode Either `client` or `server`."
+  }
+
   mode :=  args[1]
   if mode == "server" {
     startServer()
