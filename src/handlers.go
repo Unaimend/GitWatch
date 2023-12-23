@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"html"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -125,30 +124,29 @@ func (h *DataBaseHandler) RemoveHandler(w http.ResponseWriter, r *http.Request) 
 	  // Unmarshal the JSON data into the map
 	  err = json.Unmarshal([]byte(body), &keyValueMap)
 	  if err != nil {
-	  	fmt.Println("Error unmarshaling JSON:", err)
+	  	log.Println("Error unmarshaling JSON:", err)
 	  	return err
 	  }
-
 	  // Access the key-value pair
 	  // Access the data
-	  fmt.Printf("Remover Received data: %+v\n", keyValueMap)
+	  log.Printf("Remover Received data: %+v\n", keyValueMap)
 
-    fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
+    //fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
 
 	  // Write data to the bucket
 	  key := []byte(keyValueMap["key1"])
 
-		// Delete the key from the bucket.
-
     value := bucket.Get(key)
-    fmt.Println("WHY", value)
 		if len(value) == 0  {
-      fmt.Println("EMPTRY")
-      w.Write([]byte("Repository " + string(key) + " does not exist"))
+      //w.Write([]byte("Repository " + string(key) + " does not exist"))
+      http.Error(w, "Path does not exist", http.StatusNotFound)
 			return nil
 		} 
 
 		err = bucket.Delete(key)
+    fmt.Fprintf(w, "%s removed", key)
+
+
 		if err != nil {
 			return err
 		}

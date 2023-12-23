@@ -28,7 +28,7 @@ func realMain(args []string) string  {
     } else if arg == "remove" {
       return remove(os.Args[3])
     } else {
-      return "Unknown argument, should be add|status"
+      return "Unknown argument, should be add|status|remove"
     }
   } 
   return "Unknown mode"
@@ -109,7 +109,7 @@ func addRepository(path string) string {
 	  log.Println("There was an error during adding the current path")
 	  return "Error during adding the path"
 	}
-  return "Path added"
+  return path + " added"
 }
 
 
@@ -164,18 +164,24 @@ func remove(path string) string {
 	}
 	defer resp.Body.Close()
 
-	// Print the response status and body
-	log.Println("Response Status:", resp.Status)
-  if  resp.Status != "200 OK" {
-	  log.Println("There was an error during adding the current path")
-	  return "Error during removing the path"
-	}
 
   body, err := ioutil.ReadAll(resp.Body)
   if err != nil {
     fmt.Println("Error reading response body:", err)
     return ""
   }
-  print(body)
-  return path + " removed"
+
+	// Print the response status and body
+	log.Println("Response Status:", resp.Status)
+  if  resp.Status == "404 Not Found" {
+	  return string(body)
+	}
+
+  if  resp.Status != "200 OK" {
+	  log.Println("There was an error during removing the current path")
+	  return "Error during removing the path"
+	}
+
+  print()
+  return  string(body)
 }
