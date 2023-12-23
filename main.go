@@ -99,6 +99,7 @@ func addRepository(path string) string {
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Println("Error sending request:", err)
+    // TODO Habndle server not runniong here
 		return "Error during sending"
 	}
 	defer resp.Body.Close()
